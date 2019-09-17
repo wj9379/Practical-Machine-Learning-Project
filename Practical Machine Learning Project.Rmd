@@ -1,0 +1,75 @@
+#Get Datasets
+##Load libraries
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(RColorBrewer)
+library(rattle)
+library(e1071)
+library(randomForest)
+library(VIM)
+library(dplyr)
+library(tidyr)
+library(rpart.plot)
+
+set.seed(1234)
+##Load datasets
+train.url <-
+        "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+test.url <- 
+        "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+
+train <- file.path( "machine-train-data.csv")
+test <- file.path("machine-test-data.csv")
+
+if (!file.exists(train)) {
+        download.file(train.url, destfile=train)
+}
+if (!file.exists(test)) {
+        download.file(test.url, destfile=test)
+}
+
+train_raw=read.csv(train,na.strings=c('NA','#DIV/0!',""))
+test_raw=read.csv(test,na.strings=c('NA','#DIV/0!',""))
+
+
+#Clean Datasets:
+##Remove colunmns with NAs and irrelevant variables
+dim(train_raw)
+summary(aggr(train_raw,sortVar=TRUE))$combinations
+train_clean=train_raw[,colSums(is.na(train_raw))==0]
+dim(train_clean)
+dim(test_raw)
+summary(aggr(train_clean,sortVar=TRUE))$combinations
+test_clean=test_raw[,colSums(is.na(test_raw))==0]
+dim(test_clean)
+summary(aggr(test_clean,sortVar=TRUE))$combinations
+train_clean=train_clean[,-c(1:7)]
+test_clean=test_clean[,-c(1:7)]
+
+##Slice the data, 70% training dataset and 30% testing dataset. And we could see from the histogram below that level A is most frequency and level D is the least frequent.
+trainingset <- createDataPartition(y=train_clean$classe, p=0.7, list=FALSE)
+train_trainingset <- train_clean[trainingset, ] 
+test_trainingset <- train_clean[-trainingset, ]
+plot(train_trainingset$classe,xlab='classe',ylab='Frequency',main='Levels of Variables Classe')
+
+#Estimate Model
+##Model 1: Decision Tree: Fit a classfication tree
+model1=rpart(classe~.,data=train_trainingset,method="class")
+prediction1=predict(model1,test_trainingset,type='class')
+rpart.plot(model1,main='Classification Tree',extra=103,under=T,faclen=0)
+##Model1 Results Testing:The accuracy for decision tree model is 0.7215(95%,CI:(0.7098, 0.7329))
+confusionMatrix(prediction1,test_trainingset$classe)
+##Model 2:Random Forest: Fit a random forest model since it automatically selects important variables and reduce the variance as well
+model2=randomForest(classe~.,data=train_trainingset,method='class')
+prediction2=predict(model2,test_trainingset,type='class')
+##Model2 Results Testing:The accuracy for random forest is 0.9952 (95%, CI:(0.9931, 0.9968))
+confusionMatrix(prediction2,test_trainingset$classe)
+##Model Selection 
+#The random forest model is chosen since it has a higher accuracy.
+
+#Submission
+predictfinal <- predict(model2, test_clean, type="class")
+predictfinal
+##Use Random forest algorithm to predict outcome levels on the original testing dataset.
